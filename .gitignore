@@ -1,0 +1,16 @@
+# Virtual environment
+.venv_a1/
+.venv/
+__pycache__/
+*.pyc
+
+# Database credentials
+.env
+
+# Source data
+data/input/*
+!data/input/.gitkeep
+
+# Generated outputs
+data/output/*
+!data/output/.gitkeep
