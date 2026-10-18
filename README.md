@@ -156,3 +156,44 @@ git push origin main
 ```
 
 Review `git status` before committing. The output CSV is intentionally excluded from Git; provide it through the requested take-home delivery channel.
+
+## Data Pipeline — Table Lineage
+
+| Step | Script | Input Tables / Files | Output Tables / Files | Description |
+|---|---|---|---|---|
+| **01 — Schema Setup** | `01_create_tables.sql` | — | `a1.raw_patient_records` | Creates the raw data structure for both source systems. |
+| **02 — Ingestion** | `02_ingest.py` | `Clinic_EHR_Export.csv`<br>`Billing_System_Export.xlsx` | `a1.raw_patient_records` | Loads 100,000 records, preserving source identifiers and original attributes. |
+| **03 — Data Profiling** | `03_data_profiling.sql` | `a1.raw_patient_records` | `03_data_profiling.txt` | Analyzes missing values, duplicates, identifier conflicts, and formatting inconsistencies. |
+| **04 — Normalization** | `04_normalize.sql` | `a1.raw_patient_records` | `a1.stg_patient_records` | Standardizes names, DOBs, SSNs, and contact information while preserving original records. |
+| **05 — Identity Matching** | `05_match_records.sql` | `a1.stg_patient_records` | `a1.patient_match_candidates`<br>`a1.patient_matches` | Generates candidate pairs, evaluates matching evidence, and identifies accepted, rejected, and ambiguous relationships. |
+| **06 — Entity Resolution** | `06_resolve_entities.sql` | `a1.stg_patient_records`<br>`a1.patient_matches` | `a1.person_record_map`<br>`a1.group_merge_audit` | Groups compatible records using SSN anchors and conservative conflict checks. |
+| **07 — Consolidation** | `07_consolidate.sql` | `a1.person_record_map`<br>`a1.raw_patient_records`<br>`a1.stg_patient_records` | `a1.persons` | Consolidates distinct patient attributes and preserves all associated Record IDs. |
+| **08 — Validation** | `08_validate.sql` | `a1.persons`<br>`a1.person_record_map`<br>`a1.stg_patient_records` | `08_validation_report.txt` | Validates completeness, uniqueness, reconciliation, and identifier integrity. |
+| **09 — Export** | `09_export.py` | `a1.persons` | `persons.csv` | Exports the final dataset containing one row per identified person. |
+
+## Table Lineage Chart
+
+```mermaid
+flowchart TD
+    A["Clinic EHR CSV<br/>65,056 records"]
+    B["Billing XLSX<br/>34,944 records"]
+
+    C["01–02: Raw Ingestion<br/>a1.raw_patient_records"]
+    D["03: Data Profiling<br/>Quality & Duplicate Analysis"]
+    E["04: Normalization<br/>a1.stg_patient_records"]
+    F["05: Identity Matching<br/>a1.patient_match_candidates<br/>a1.patient_matches"]
+    G["06: Entity Resolution<br/>a1.person_record_map<br/>a1.group_merge_audit"]
+    H["07: Consolidation<br/>a1.persons"]
+    I["08: Validation<br/>Integrity & Reconciliation"]
+    J["09: Export<br/>persons.csv"]
+
+    A --> C
+    B --> C
+    C --> D
+    C --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I -->|PASS| J
+```
